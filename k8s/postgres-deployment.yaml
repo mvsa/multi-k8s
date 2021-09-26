@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: postgres
+  template:
+    metadata:
+      labels:
+        component: postgres
+    spec:
+      volumes: # this area is just to alocate the needed memory **
+        - name: postgres-storage
+          persistentVolumeClaim: 
+            claimName: database-persistent-volume-claim
+      containers:
+        - name: postgres
+          image: postgres
+          ports:
+            - containerPort: 5432
+          volumeMounts: 
+            - name: postgres-storage # ** and here im applying the config to the containers
+              mountPath: /var/lib/postgresql/data  # data directory where postgress will store data on HD
+              #for postgres in particular we need the following config:
+              subPath: postgres # any data inside the container that is stored in the mountPath
+              # is going to be stored in a folder called 'postgres' inside the actual PVC
+          env:
+            - name: POSTGRES_PASSWORD #overrides default password of postgress database, not related to line 34 of server deploy
+              valueFrom:
+                secretKeyRef:
+                  name: pgpassword
+                  key: PGPASSWORD

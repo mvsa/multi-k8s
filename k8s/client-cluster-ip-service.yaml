@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-cluster-ip-service
+spec:
+  type: ClusterIP
+  selector:
+    component: web # reference to the multi client
+  ports:
+    - port: 3000  #how other objects can access the pod that we will be providing acess (multi client pods)
+      targetPort: 3000 # the port on the target pod that we will be provinding access

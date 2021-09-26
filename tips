@@ -1,0 +1,192 @@
+docker-compose up
+Original Files/folders deleted: travis.yml / docker-compose / dockerrun.aws / ./nginx
+Folder k8s created to house all kubenets configs
+created multi client config
+created clusterIp service attached to multi clients
+created multi server (express) config
+created clusterIp service attached to multi server
+created multi worker config file
+created redis config file and its service
+created postgres config file and its service
+created claim config files and updated postgres deployment
+defined env variable to multi worker(redishost/redisport)
+defined env variable to multi server (pguser, pghost, pgdatabase, pgport, pgpassword)
+installed ingress specific for docker desktop windows/ and GCE-GKE load balancer
+created ingress config file
+--------------------------------------------------------------------------------------
+This is a multi container application that originally was running on elastic beanstalk and will be converted to
+kubernetes (1 config file for each object = total of 11)
+
+
+---------------------------------------------------------------------------------------------------------------
+**Persistent volume claim** 
+PVC
+Volume: share file system of a host machine with file system inside a container
+
+if a pod crashes/restarts, and inside this pod we have a postgree container, the data stored inside this pod will be lost! (because the crashed pod will be deleted and a new one created)
+
+by sharing the system file of a host to the containers it gives the pod the capacity to store some volume of data on the host that its running (good for databases)
+
+only increasing the replicas (number) of a postgres deployment will not be the best strategy because we will end up with two pods accessing the same volume.
+The problem is the pods is not aware of each other and it can cause problems.
+To scale databases we needo to follow some additional configs besides just incrementing the number of replicas
+
+
+Volume in generic container terminology = some type of mechanism that allows a container to access a filesystem outside itself
+
+Volume in Kubernets = an OBJECT that allows a container to store data at the POD level {Persistent volume claim *** / Persistent volume ** / Volume*}
+
+* Volume in kubernets will survive container restarts, but not pod restarts, not good for databases
+
+
+** Persistent Volume: alowws container to store data outside the pod/deployment.
+It can survive restarts and crashes
+
+** Persistent Volume Claim: 
+advertisiment of options of storage given to be used in the future, there are two options: 
+
+1- Staticlly provisioned persistente volume = volumes available ahead of time, they have alread been created and can be used
+
+2 - Dinamically provisioned persisten volume = volumes that are not yet been created but can be created on the fly when requested.
+
+We will attach this PVC to the postegres deployment
+
+in a dev enviroment the only option to storage available will be the harddrive of the device, and so we dont need to specify the source in the config file
+In an cloud provider (prod) kubernets will automaticly set based on wich storage option you are using
+but i can me manually set too (storageclassname)
+
+known storage options: {
+    Google cloud persistent disk / azure file / azure disk / aws block store
+    kubernetes.io/docs/concepts/storage/storage-classes
+}
+
+pvc = is the advertisment of what can be get
+pv = is the actual instance of storage that meets the requirements of the pvc
+
+
+**ClusterIP Service**
+Exposes a set of pods to other objects in the cluster
+Allow that any other object inside our cluster to access the object that the clusterip is point out. Only internal
+not to the outside world
+
+In ex, if a deployment has a clusterIP atached to it, this deployment can be accessed by any other object inside the cluster. Whitou it they will become unreachable
+
+**NodePort Service**
+Exposes a container to the outside world (only good for dev purposes)
+
+**Ingress Service**
+Front door, traffic (outside world) will come to the ingress and then the deployments will be accessible
+Exposes a set of services to the outside world
+There are some differente implementation of ingress, in this project we are using Nginx Ingress
+ - We are using ingress-nginx, a community led project: github/kubernets/ingress-nginx
+ - We are not using kubernetes-ingress, a project led by the company nginx: github/nginxinc/kubernetes-ingress
+
+The setup of our ingress-nginx changes depending on our enviroment (loca, GC, aws, azure, etc)
+In this projetc, it will be setup in local and GC
+
+
+In ingress we also use the concept of 'Controller' (see Trivia section).
+Where we have a desired state described in a file (ex: routing rules to get traffic to services)
+and we feed that file in kubclt and a controler is create to make our current state to change to our desired state (in this case, current state were 'no routing' and new state 'pod running nginx that handles routing, and is always waching for changes or updates' )
+
+Ingress config > ingress controller > something that accepts inconming traffic and redirect to apropriate service
+
+obs: with the project used (ingress-nginx) the controller and the 'something' that routes traffic are the same entity (we will be a single deployment)
+
+
+(check images, on GC the loadBalancer service will still be used, but in a encapsulated manner)
+( check images, when we use a nginx ingress there is going to be another deployment inside our cluster named
+default-backend that is used for a series of health checks in the cluster, in a ideal case, this deployment is replaced by our express api server,  it is ideal that helth checks goes to the multi server, but in this project we will be using the defaul-backend)
+
+ - q: Why we just dont use a normal nginx pod to make this traffic handle?
+    a: we will ingress-nginx because it has many pieces of code that makes it aware that is running inside a kubernets cluster. An example is it can bypass the clusterIP (evading a random load balanced access) service in front of a deployment, and directly access the pods. It allows features like 'Sticky sessions' that make possible that all requests from a user goes directly to the same server
+
+further reading about ingress-nginx: https://www.joyfulbikeshedding.com/blog/2018-03-26-studying-the-kubernetes-ingress-system.html
+
+Ex of traffic routing:
+Look at the path of incoming request -> if has a path of / -> goes to client
+                                    -> if has a path of /api goes to server
+
+
+
+
+**Load Balance Service** 
+Legacy way of getting network traffic into a cluster, only grants access to ONE set of pods
+it will use your cloud provider (aws, google, etc) and will create a loadBalancer with their configuration or definition of what a load balance is
+
+
+
+**Secrets**
+Object Type that securely stores a piece of information in the cluster, such as
+database password
+to create a secret we use a imperative command,this way we dont have to write our secret in some config file.
+This means that in a production enviroment we will have to manually set this config aswell.
+
+- kubectl create secret generic <secrete_name> --from-literal key=value -
+    ex kubectl create secret generic pgpassword --from-literal PGPASSWORD=pass123
+
+generic = type Of secret {other types of types docker-registry / tls}
+--from-literal = means that we are going to add the secret information into this command, as opposed to from a file
+
+-------------------------------------------------------------------------------------
+**COMMANDS**
+kubectl apply -f k8s   =  apply all config files from one directory
+kubectl logs <name of object>
+
+kubectl get storageclass = return the list of available storage options
+kubectl describe storageclass
+
+kubectl create secret generic <secrete_name> --from-literal key=value
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.0.0/deploy/static/provider/cloud/deploy.yaml
+
+kubectl get pods -n ingress-nginx
+
+
+-------------------------------------------------------------------------------------------
+**TRIVIA:**
+Nginx server = routing inside application was replaced by ingress service
+
+rather than putting a separate file for each one of the objects we can create a single file to group different objects config, just copy and paste on the end of each config followed by a --- at the final line (not doing this in this project)
+
+When aplying config giles = cannot convert int64 to string
+occours when in our config files we provided some env variable as integers:
+ex: value:6579
+to correct this, use single quotes on this values 
+
+In kubernets a controller is any kind of object that constantly works to make some desire state a reality inside our cluster.
+ex. We have a config file that set our spectation from a desired state, then a deployment is mande to make that we get out from a current stat of 0 running pods to a new state of X running pods based on our config file
+
+replicasets and replication controlers are deprecated in order of Deployments
+
+**ADMIN DASHBOARD**
+get most recente script: https://github.com/kubernetes/dashboard#install
+
+Open up the downloaded file in your code editor and use CMD+F or CTL+F to find the args. Add the following two lines underneath --auto-generate-certificates:
+
+args:
+  - --auto-generate-certificates
+  - --enable-skip-login
+  - --disable-settings-authorizer
+
+
+
+   Run the following command inside the directory where you downloaded the dashboard manifest file a few steps ago:
+
+kubectl apply -f kubernetes-dashboard.yaml
+
+ Start the server by running the following command:
+
+kubectl proxy
+
+ You can now access the dashboard by visiting:
+
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+Click the "SKIP" link next to the SIGN IN button.
+
+! The only reason we are bypassing RBAC Authorization to access the Kubernetes Dashboard is that we are running our cluster locally. You would never do this on a public-facing server like Digital Ocean and would need to refer to the official docs to get the dashboard setup.
+
+If you wish to instead create a sample user, you can follow the instructions here:
+
+https://github.com/kubernetes/dashboard/blob/master/docs/user/access-control/creating-sample-user.md

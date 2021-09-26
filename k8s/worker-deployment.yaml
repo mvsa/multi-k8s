@@ -1,0 +1,28 @@
+#this deployment is responsible for the fibonacci calculation, that is very heavy computing.
+#if anything in this cluster has to be scaled up it will be this deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: worker
+  template:
+    metadata:
+      labels:
+        component: worker
+    spec:
+      containers:
+        - name: worker
+          image: stephengrider/multi-worker
+          env:
+            - name: REDIS_HOST
+              value: redis-cluster-ip-service #NAME OF THe service, acts like a host address
+            - name: REDIS_PORT
+              value: '6379'
+
+#because there isn't another object that need to direct connect to this worker to get an information it will not
+#have an service. The multiworker will connect to something else(redis ClusterIp Service),
+# and not the other way around

@@ -1,0 +1,40 @@
+#express server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      component: server
+  template:
+    metadata:
+      labels:
+        component: server
+    spec: #behaviour of each pod created
+      containers: #lista de containers que o pod deve rodar, neste caso temos apenas 1
+        - name: server
+          image: stephengrider/multi-server
+          ports:
+            - containerPort: 5000
+          env:
+            - name: REDIS_HOST 
+              value: redis-cluster-ip-service
+            - name: REDIS_PORT
+              value: '6379'
+            - name: PGUSER
+              value: postgres # default user of postgres, not good for prod
+            - name: PGHOST
+              value: postgres-cluster-ip-service
+            - name: PGPORT
+              value: '5432'
+            - name: PGDATABASE
+              value: postgres # default database of postgres
+            - name: PGPASSWORD #  this is the name of the env variable not the name of the key inside the secret, its a local reference
+              valueFrom: 
+                secretKeyRef:
+                  name: pgpassword # identifier (name) of the secret created
+                  key: PGPASSWORD # key value created in the command
+
+            #env variables that the express needs to conect to redis/postgres
