@@ -190,3 +190,128 @@ Click the "SKIP" link next to the SIGN IN button.
 If you wish to instead create a sample user, you can follow the instructions here:
 
 https://github.com/kubernetes/dashboard/blob/master/docs/user/access-control/creating-sample-user.md
+
+
+
+---------------------------------------------------------------------------------------
+Process of deploy:
+Create github repo > 
+Tie repo to Travis CL **
+Create Google Cloud Project
+Enable billing *
+add deployment scripts
+
+*Google cloud cost calculator  = kubernets engine = 3 nodes = standart = 1 persist disk 2gb
+load balance 1 forwarding rule > 100 mbnetword traffic proccedd :
+cost: 42 dolar per month
+1,40 cents a day
+
+Why Google Cloud:
+    Google created Kubernetes
+    AWS only 'recently' got kubernetes support
+    far easier to poke around k8s on GC
+    Good documentation for begginers
+
+
+1 - ** https://app.travis-ci.com/{
+create account
+Sync repos of github
+
+}
+
+2 - Create google cloud project > enable billing to it
+then, menu > Kubernets Engine >  Enable > after enabled click on create'> Configure GKE Standard:
+Name: multi cluster (name of projetc)
+zone: southamerica
+default-pool dropdown: machine specifcs
+After a few minutos check the cluster dashboard
+and click on the cluster name to see its specifications
+
+Menu workloads= lists pods and deployments
+configuration = lists secretes or env. variables
+
+3 - Travis ymal file, builds images and deploy application to gke
+
+config file general idea:
+install google cloud sdk cli - cli that allows us to interact with kubernetes cluster in GKE
+configure the sdk with out google cloud auth info
+login to docker cli
+build the test version of multi-client
+run testes
+if testes are sucessful, run a script to deploy newest images
+build all our images, tag each one, push each to docker hub
+apply all configs in the k8s folder
+imperatively set latest images on each deployment
+
+create .travis.yaml file inside the root of project
+
+## to create a service account .json file
+go for IAM & Admin > service account > create service account
+name: travis-deployer (could be any other) > create and continue
+Select role > Kubernets Engine > Kubernetes engine admin > continue > one
+-In the list of service account, click on the three dots > Manage Keys
+
+Add Key> create a new key>Json (DO NOT EXPOSE THIS FILE)
+>Download and install the travis CLI ##
+> Encrypt and upload the json file to our travis account
+> in travis.yml, add code to unencrypt the json file and load it into Gcloud SDK
+
+## Installin travis CLI
+It requires ruby to be installed locally, and because of that it will be better to use a docker image that has ruby
+and acces its shell to isntall travis cli. Because we will just use the travis clt o encrypt the
+file and after that we can delete it (the container)
+
+> winpty docker run -it -v ${pwd}:/app ruby:2.4 sh -- for gitbash i can iuse ()/ prefer to run it in powershell
+{
+    -v ${pwd}:/app = here we are setting up an volume to be able to store de .json file in it
+    pwd = present working directory
+    :/app = pwd will be a directory named app
+    its important to run this command in the folder of the project, because we will then get access to our folder project inside the container inside the folder app
+
+    inside the container
+    ls > cd app
+}
+
+> gem install travis
+>travis login {
+
+The Travis login now requires a Github Token. Please follow these instructions to create a Personal Token for Travis to use here:
+
+https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token
+
+This will also require setting the scope. Travis requires the permissions noted here:
+
+https://docs.travis-ci.com/user/github-oauth-scopes/#repositories-on-httpstravis-cicom-private-and-public
+
+The login command will now look like this:
+
+
+travis login --github-token YOUR_PERSONAL_TOKEN --com
+
+or
+
+travis login --github-token YOUR_PERSONAL_TOKEN --pro
+
+When you encrypt the file, you must pass the same --com or --pro flag you used to log in:
+
+travis encrypt-file service-account.json -r USERNAME/REPO --com
+
+or
+
+travis encrypt-file service-account.json -r USERNAME/REPO --pro
+
+If you are getting iv undefined errors, you may have missed passing the --com or --pro flags to both the login and encryption commands. Also, if you still have a .org Travis account these old accounts will need to be migrated to .com ASAP.
+
+Please visit the migration guide here:
+
+https://docs.travis-ci.com/user/migrate/open-source-repository-migration#migrating-a-repository
+
+You can also get an iv undefined error if you've passed the wrong repo to the file encryption or passed a repo name with a typo in it. Please note, after the migration, or after fixing a typo, you'll need to run through the entire encryption process again.
+
+
+}
+>copy and rename json file in the 'volumed' directory so wa can use it in the container
+>travis encrypt-file service-account.json -r mvsa/multi-k8s --com
+> update yaml files with instrucins of travis (and get a file that will be created)
+> DELETE THE ORIGINAL json file
+> after that you can remove de container travis
