@@ -142,6 +142,9 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 
 kubectl get pods -n ingress-nginx
 
+- kubectl rollout restart deployment <deployment name>
+- A rolling restart will be used to restart each pod in order from deployment. This is the most recommended strategy because it will not cause a service break. Write the below-affixed command in the terminal.
+
 ##
 kubectl set image deployments/server-deployment server=mvsa/multi-server - set an image for a deployment imperatively
 
@@ -428,3 +431,12 @@ that is not native to the kubernets, its all by google, it will manage the traff
 ## DEPLOY ##
 commit our work and commit to our master branch to github
 travis ci will pick our changes run the yaml file and the deploys.sh
+See processOfChange file
+
+
+
+## Google Cloud Cleanup ##
+
+>Click on the project selector of the top letf
+>Find your project in the list of projects then click on the three dots and click delete
+> 
