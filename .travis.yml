@@ -26,7 +26,6 @@ before_install:
   #login to docker
   - docker build -t mvsa22/react-test -f ./client/Dockerfile.dev ./client
   # file to build and build context
-  - docker run -e CI=true USERNAME/react-test npm test
 
 script:
   - docker run -e CI=true mvsa22/react-test npm test
