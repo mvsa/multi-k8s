@@ -1,0 +1,8 @@
+**Process of update repo in pr**
+Checkout a branch
+Make changes
+Commit changes to github branch
+create a pr
+Wait for tests to show up green - travis will do tests for every branch and pr, but only deploys in prd
+Merge de pr
+See changes in prd
