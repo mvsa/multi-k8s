@@ -142,7 +142,34 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 
 kubectl get pods -n ingress-nginx
 
+##
+kubectl set image deployments/server-deployment server=mvsa/multi-server - set an image for a deployment imperatively
 
+by default set image will always look for the :latest tag if we omit it on the command. This tag is automaticaly created if we do not directly define a tag,
+This can be problematic in a deploy process, because if we want to update the image with its new version kubeclt will think its the same image, because its already on the :latest tag.
+to override this:
+
+we need to tag this image with a unique tag so that the deployment can see that a new version is available
+
+but we can also define a automaticaly process of tagging
+
+docker build -t docker_id/docker_repo:latest -t docker_id/docker_repo:$GIT_SHA -f ./client/Dockerfile .client
+
+using the sha that always will be different in every commit
+**kubeclt set image mvsa22/multi-client client=docker_id/multi-client:12312312321312321314124**  <-example of sha
+
+this will help too for debugging, because every deployment will have the id of the commit that can be broken
+and we can easily change for a older state
+
+$GIT_SHA is a uid that is follows every commit to individually identy it, we will replace this key by the sha
+
+git rev-parse HEAD shows the current sha of latest commit tree, and git log will show the list
+##
+
+
+**in the command  docker build -t docker_id/docker_repo:latest -t docker_id/docker_repo:$GIT_SHA -f ./client/Dockerfile .client we run two times the -t session because we can also use the implicity latest to in case a new dev joins the team, when he runs the apply he will still get the latest images, without the need to know the SHAS to pass in the command. The second part of the commnad is aimed for deploy in production and the first for dev. In the end, we will be applying two tags for the build image**
+
+SEE DEPLOY.SH FILE
 -------------------------------------------------------------------------------------------
 **TRIVIA:**
 Nginx server = routing inside application was replaced by ingress service
@@ -315,3 +342,88 @@ You can also get an iv undefined error if you've passed the wrong repo to the fi
 > update yaml files with instrucins of travis (and get a file that will be created)
 > DELETE THE ORIGINAL json file
 > after that you can remove de container travis
+
+
+
+## log in to docker cli
+-Definig user/password inside travis:
+on the repo = more options>settings>env. variables
+define two new entries = DOCKER_PASSWORD DOCKER_USERNAME
+
+## deploying
+Travis does have built in provider to deploy code of a kubernetes cluster
+to do it, we need to mount the script folder with the commands
+
+after configuring the ymal and the sh> 
+we need to create a secret in the GC to store the password of the database, as we did in local enviroment, 
+because the secret is bound to the cluster
+to do so:
+Go to 'activate cloud shell' in the upper right
+this terminal will be running in the context of our GC project
+we can use commands any set of commands to any of our production resources, it will run directly to our cluster
+
+we also need to use some commands that were defined un the travis.yml: to tbe able to run kubctl properly
+ we just need to run one time(the first) per cluster/project
+> set project id = gcloud config set project multi-k8s-327220
+> set compute zone = gcloud config set compute/zone southamerica-east1-a
+> set credentials = gcloud container clusters get-credentials multi-cluster
+
+after that, to define the secret:
+kubectl create secret generic pgpassword --from-literal PGPASSWORD=pass123
+
+now, we also need to isntall nginx-ingress, that is a separated project the we use in our dev env.
+ nginx.ingress.kubernetes.io/
+
+ structure:
+ ingress config file / load balance service mapped to a GC load balancer / deployment running nginx controller and pod
+
+ 
+ to do so, (install it as a separated service)
+
+isntead of  manually running the same command we did in dev (apply) we will be usgin helm, that is
+a program to manage third party software inside kubernets cluster. Its an package manager
+to install it, run this 3 commands separately:
+
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+
+chmod 700 get_helm.sh
+
+./get_helm.sh
+
+{
+    Role based access control rbac
+    limits who can access and modify objects in our cluster
+    enabled on GC by default
+
+}
+
+
+install ingres-nginx
+
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm install my-release ingress-nginx/ingress-nginx
+
+
+
+IMPORTANT: If you get an error such as chart requires kubeVersion: >=1.16.0-0.....
+
+You may need to manually upgrade your cluster to at least the version specified:
+
+gcloud container clusters upgrade  YOUR_CLUSTER_NAME --master --cluster-version 1.16
+
+>> In gc, se workloads tab
+to see deployments
+it now will list the ingress nginx controller, that is the deployment that manages de pod that
+runs the controller that is going to read our config file and setup nginx appropriately 
+
+>> in the services & ingress tab, it will show and item of type load balancer with 2 endpoints
+if there is only one endpoint, wait some time because it may take a few minutos for the LOad balancer ip to be available
+these will be the ip addresses to acces the project
+
+>> in the menu network services > load balancing, it will show the LB createad by google cloud
+that is not native to the kubernets, its all by google, it will manage the traffic and then redirect to our cluster by directing to our load balance servce (kubernets service) that directs traffic to our nginx ingress controller and then to our different deplyments
+
+
+## DEPLOY ##
+commit our work and commit to our master branch to github
+travis ci will pick our changes run the yaml file and the deploys.sh
